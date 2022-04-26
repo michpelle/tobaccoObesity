@@ -1,0 +1,16 @@
+---
+title: "main"
+author: "Michelle Pan"
+date: "4/26/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r summary}
+ggplot(bothByYear, aes(x=Year, y=percChangeCig, color="Percent Change in Cigarette Sales")) + geom_point() + geom_point(data=bothByYear, aes(x=Year, y=percChangeObesity, color="Percent Change in Obesity")) + geom_hline(yintercept=0, color = "red")
+
+bothByYearCombined
+```
