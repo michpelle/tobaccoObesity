@@ -11,9 +11,6 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, stringr, readxl, data.table, 
 gdata, scales, stargazer, ivpack, knitr, tinytex)
 library(tidyverse)
-library(rdrobust)
-library(rddensity)
-library(MatchIt)
 library(cobalt)
 library(tinytex)
 library(lubridate)
@@ -22,9 +19,11 @@ library(rmarkdown)
 load("workspace.RData")
 ```
 
+github repository: https://github.com/michpelle/tobaccoObesity
+
 ## Table and Figures
 
-```{r table1, message=FALSE, warning=FALSE, echo=FALSE}
+```{r table1, message=FALSE, warning=FALSE, echo=FALSE, fig.cap="Table 1"}
 summaryTable <- bothByYear2 %>% mutate(SalesPerCapita=sales.x, ObesityRate=obesity.y) %>% select(Year,SalesPerCapita,ObesityRate, percChangeCig, percChangeObesity)
 
 knitr::kable(summaryTable,
@@ -33,7 +32,7 @@ knitr::kable(summaryTable,
              caption="", booktabs=TRUE) 
 ```
 
-```{r figure1, message=FALSE, warning=FALSE, echo=FALSE}
+```{r figure1, message=FALSE, warning=FALSE, echo=FALSE, fig.cap="Figure 1"}
 ggplot(CigData, aes(x=Year,y=price_cpi_2012)) +
   stat_summary(fun.y="mean",geom="line") +
   labs(
@@ -44,7 +43,7 @@ ggplot(CigData, aes(x=Year,y=price_cpi_2012)) +
   scale_x_continuous(breaks=seq(1970, 2020, 5))
 ```
 
-```{r figure2, message=FALSE, warning=FALSE, echo=FALSE}
+```{r figure2, message=FALSE, warning=FALSE, echo=FALSE, fig.cap="Figure 2"}
 ggplot(bothByYear2, aes(x=Year,y=sales.x, color="Cigarette Sales")) +
   geom_line() +
   geom_line(data=bothByYear2,aes(x=Year,y=obesity.y, color="Obesity")) +
@@ -52,7 +51,7 @@ ggplot(bothByYear2, aes(x=Year,y=sales.x, color="Cigarette Sales")) +
   xlab("Year") + ylab("Sales per Capita or Percent Obesity")
 ```
 
-```{r figure3, message=FALSE, warning=FALSE, echo=FALSE}
+```{r figure3, message=FALSE, warning=FALSE, echo=FALSE, fig.cap="Figure 3"}
 #ggplot(bothByYear2, aes(x=Year, y=percChangeCig, color="Percent Change in Cigarette Sales")) + geom_point() + geom_point(data=bothByYear2, aes(x=Year, y=percChangeObesity, color="Percent Change in Obesity")) + geom_hline(yintercept=0, color = "red")
 
 #ggplot(bothByYear2, aes(x=percChangeCig, y=percChangeObesity)) + geom_line()
@@ -69,25 +68,34 @@ ggplot(bothByYear2, aes(x=sales.x, y=obesity.y)) + geom_line() +
   xlab("Cigarette Sales per Capita") + ylab("Obesity Rate")
 ```
 
-```{r table2, warning=FALSE, message=FALSE, echo=FALSE, results='asis'}
+```{r table2, warning=FALSE, message=FALSE, echo=FALSE, fig.cap="Table 2", results='asis'}
 # first stage for prices on sales
 firstStagePrice <- lm(formula = sales_per_capita ~ cost_per_pack, data = regressionData)
 
 # first stage for taxes on sales
 firstStageTaxes <- lm(formula = sales_per_capita ~ tax_dollar, data = regressionData)
 
-stargazer(firstStagePrice, firstStageTaxes, type="text")
+stargazer(firstStagePrice, firstStageTaxes, type="latex", model.names=TRUE, object.names=TRUE)
 ```
 
-```{r resultRegression, message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
-stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv,
-                type="latex", model.names=TRUE, object.names=TRUE,
-                omit=c("state","Year"),
-                add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes",
-                        "Year Fixed Effects & No & No & Yes & No & No & Yes"))
+```{r allRegression, message=FALSE, warning=FALSE, echo=FALSE, fig.cap="Table 3"}
+
+all <- stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv,
+                type="text", omit=c("state","Year"),
+              add.lines=list(c("State FE, No , Yes , Yes , No , Yes , Yes"),
+                         c("Year FE , No , No , Yes , No , No , Yes")),
+           align=TRUE, no.space=TRUE)
+
+all
+
+#stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv,
+#                type="latex",
+#                omit=c("state","Year"),
+#                add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \\\  ",
+#                        "Year Fixed Effects & No & No & Yes & No & No & Yes \\\ "))           
 ```
 
-```{r resultFirstStageReduced, message=FALSE, warning=FALSE, echo=FALSE, results='asis'}
+```{r resultFirstStageReduced, message=FALSE, warning=FALSE, echo=FALSE, results='asis', fig.cap="Table 4"}
 stargazer(firstStage,reducedForm, type="latex", model.names=TRUE, object.names=TRUE)
 ```
 
