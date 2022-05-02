@@ -157,35 +157,3 @@ save.image("workspace.RData")
 
 
 
-
-
-
-
-
-
-## in two stages
-step1 <- lm(obesity ~ sales_per_capita, data=regressionData)
-d.hat <- predict(step1)
-step2 <- lm(obesity ~ d.hat, data=regressionData)
-summary(step2)
-
-# state and year fixed effects
-fixedEffects = fixest::fixef(ols)
-summary(fixedEffects)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
