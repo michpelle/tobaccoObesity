@@ -115,13 +115,13 @@ summary(iv)
 
 # OLS and IV state and year fixed effects
 
-stateFEols <- lm(ln_obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
-yearFEols <- lm(ln_obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
-stateYearFEols <- lm(ln_obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
+stateFEols <- lm(ln_obesity ~ ln_sales + factor(state) - 1, data=regressionData)
+yearFEols <- lm(ln_obesity ~ ln_sales + factor(Year) - 1, data=regressionData)
+stateYearFEols <- lm(ln_obesity ~ ln_sales + factor(state) - 1 + factor(Year) -1, data=regressionData)
 
-stateFEiv <- ivreg(ln_obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
-yearFEiv <- ivreg(ln_obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
-stateYearFEiv <- ivreg(ln_obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
+stateFEiv <- ivreg(ln_obesity ~ ln_sales + factor(state) - 1, data=regressionData)
+yearFEiv <- ivreg(ln_obesity ~ ln_sales + factor(Year) - 1, data=regressionData)
+stateYearFEiv <- ivreg(ln_obesity ~ ln_sales + factor(state) - 1 + factor(Year) -1, data=regressionData)
 
 stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv, type="text", model.names=TRUE, 
           object.names=TRUE,  omit=c("state","Year"),

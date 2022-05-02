@@ -74,17 +74,15 @@ firstStagePrice <- lm(formula = sales_per_capita ~ cost_per_pack, data = regress
 # first stage for taxes on sales
 firstStageTaxes <- lm(formula = sales_per_capita ~ tax_dollar, data = regressionData)
 
-stargazer(firstStagePrice, firstStageTaxes, type="text")
+stargazer(firstStagePrice, firstStageTaxes, type="latex")
 ```
 \ new page
 ```{r regression results, message=FALSE, echo=FALSE, global_options=TRUE, results='asis'}
-print(stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv,
-                type="latex", model.names=TRUE, object.names=TRUE,
+stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv,
+                type="text", model.names=TRUE, object.names=TRUE,
                 omit=c("state","Year"),
                 add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \ ",
-                        "Year Fixed Effects & No & No & Yes & No & No & Yes \ "),
-                tidy=TRUE),
-      scalebox='0.1',header=FALSE, keep.stat=c("n","rsq"))
+                        "Year Fixed Effects & No & No & Yes & No & No & Yes \ "))
 
 stargazer(firstStage,reducedForm, type="latex", model.names=TRUE, object.names=TRUE)
 ```
