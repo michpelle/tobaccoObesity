@@ -1,8 +1,3 @@
-library(readr)
-library(tidyverse)
-library(AER)
-library(stargazer)
-library(cobalt)
 
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, readr, readxl,
@@ -25,49 +20,75 @@ CigObesity <- inner_join(CigData,ObesityPercentOver18, by=c("Year"="YearStart","
 
 # SUMMARIES
 # Cigarette Sales Over Time
-cigSalesByYear <- CigData %>% group_by(Year) %>% summarise(sales=mean(sales_per_capita,na.rm=TRUE)) %>% mutate(obesity=NA)
-ggplot(cigSalesByYear, aes(x=Year,y=sales)) + geom_line() + ggtitle("Cigarette Sales per Capita Over Time")
+cigSalesByYear <- CigData %>% group_by(Year) %>%
+  summarise(sales=mean(sales_per_capita,na.rm=TRUE)) %>% mutate(obesity=NA)
+ggplot(cigSalesByYear,aes(x=Year, y=sales)) + geom_line() +
+  ggtitle("Average Cigarette Packs Sold per Capita 1970-2018") +
+  xlab("Year") + ylab("Sales per Capita")
 
 # Obesity Over Time
 obesityByYear <- ObesityPercentOver18 %>% filter(Question=="Percent of adults aged 18 years and older who have obesity") %>% group_by(YearStart) %>% summarise(obesity=mean(Data_Value,na.rm=TRUE)) %>% mutate(sales=NA, Year=YearStart) %>% select(Year,sales,obesity)
-ggplot(obesityByYear, aes(x=YearStart,y=obesity)) + geom_line() + ggtitle("Obesity Over Time")
+ggplot(obesityByYear, aes(x=Year,y=obesity)) + geom_line() +
+  ggtitle("Obesity Over Time") +
+  xlab("Year") + ylab("Percent Obesity")
 
 # both of above on same graph?
 
-bothByYear <- rbind(cigSalesByYear,obesityByYear) %>% filter(Year>2010)
-bothByYear <- bothByYear %>% mutate(percChangeCig=NA, percChangeObesity=NA)
+bothByYear2 <- inner_join(cigSalesByYear,obesityByYear, by="Year") %>% filter(Year>2010)
+bothByYear2 <- bothByYear2 %>% mutate(percChangeCig=NA, percChangeObesity=NA, propCig=NA, propObesity=NA)
 
-for(i in 2:nrow(bothByYear)){
-  thisYearSales <- bothByYear[i,]$sales
-  lastYearSales <- bothByYear[i-1,]$sales
+for(i in 2:nrow(bothByYear2)){
+  thisYearSales <- bothByYear2[i,]$sales.x
+  lastYearSales <- bothByYear2[i-1,]$sales.x
   percChangeCig <- 100*(thisYearSales-lastYearSales)/lastYearSales
- 
-  thisYearObesity <- bothByYear[i,]$obesity
-  lastYearObesity <- bothByYear[i-1,]$obesity
-  percChangeObesity <- 100*(thisYearObesity-lastYearObesity)/lastYearObesity
+  propCig <- thisYearSales/lastYearSales
   
-  bothByYear[i,]$percChangeCig = percChangeCig
-  bothByYear[i,]$percChangeObesity = percChangeObesity
+  thisYearObesity <- bothByYear2[i,]$obesity.y
+  lastYearObesity <- bothByYear2[i-1,]$obesity.y
+  percChangeObesity <- 100*(thisYearObesity-lastYearObesity)/lastYearObesity
+  propObesity <- thisYearObesity/lastYearObesity
+  
+  bothByYear2[i,]$percChangeCig = percChangeCig
+  bothByYear2[i,]$percChangeObesity = percChangeObesity
+  bothByYear2[i,]$propCig = propCig
+  bothByYear2[i,]$propObesity = propObesity
 }
 
-ggplot(bothByYear, aes(x=Year,y=percChangeCig, color="Cigarette Sales")) +
-  geom_point() +
-  geom_point(data=bothByYear,aes(x=Year,y=percChangeObesity, color="Obesity")) +
-  ylim(-10,10) +
-  ggtitle("CigaretteSales and Obesity Over Time")
+ggplot(bothByYear2, aes(x=Year,y=sales.x, color="Cigarette Sales")) +
+  geom_line() +
+  geom_line(data=bothByYear2,aes(x=Year,y=obesity.y, color="Obesity")) +
+  ggtitle("Cigarette Sales and Obesity Over Time") +
+  xlab("Year") + ylab("Sales per Capita or Percent Obesity")
 
-bothByYearCombined <- bothByYear %>% group_by(Year) %>% summarize(percChangeCig = mean(percChangeCig,na.rm=TRUE), percChangeObesity = mean(percChangeObesity, na.rm=TRUE)) %>% filter(Year>=2012 & Year<=2018)
-ggplot(bothByYear, aes(x=percChangeCig, y=percChangeObesity)) + geom_point()
+ggplot(bothByYear2, aes(x=Year,y=propCig, color="Cigarette Sales")) +
+  geom_line() +
+  geom_line(data=bothByYear2,aes(x=Year,y=propObesity, color="Obesity")) +
+  ggtitle("Cigarette Sales and Obesity (as proportion of last year) Over Time") +
+  xlab("Year") + ylab("Proportion")
+
+ggplot(bothByYear2, aes(x=sales.x, y=obesity.y)) + geom_line() +
+  ggtitle("Obesity Rates Increase as Cigarette Sales Decrease") +
+  xlab("Cigarette Sales per Capita") + ylab("Obesity Rate")
+
+ggplot(CigData, aes(x=Year,y=price_cpi_2012)) +
+  stat_summary(fun.y="mean",geom="line") +
+  labs(
+    x="Year",
+    y="Cost per Pack ($)",
+    title="Cost per Cigarette Pack in 2012 Real Dollars"
+  ) + theme_bw() +
+  scale_x_continuous(breaks=seq(1970, 2020, 5))
 
 # other variables that affect obesity
   # income, race, gender, education
-
 
 # adding ln to dataset
 regressionData <- CigObesity %>%
   filter(Question=="Percent of adults aged 18 years and older who have obesity") %>%
   group_by(Year,state) %>%
-  summarize(sales_per_capita = mean(sales_per_capita,na.rm=TRUE), cost_per_pack = mean(cost_per_pack,na.rm=TRUE),
+  summarize(sales_per_capita = mean(sales_per_capita,na.rm=TRUE), 
+            cost_per_pack = mean(cost_per_pack,na.rm=TRUE),
+            tax_dollar=mean(tax_dollar,na.rm=TRUE), 
             obesity=mean(Data_Value,na.rm=TRUE)) %>%
   mutate(ln_obesity = log(obesity)) %>%
   mutate(ln_sales = log(sales_per_capita)) %>%
@@ -90,7 +111,23 @@ summary(firstStageTaxes)
 iv <- ivreg(formula = ln_obesity ~ ln_sales | cost_per_pack , data = regressionData)
 summary(iv)
 
-stargazer(ols, iv, type="text", model.names=TRUE, object.names=TRUE)
+#stargazer(ols, iv, type="text", model.names=TRUE, object.names=TRUE)
+
+# OLS and IV state and year fixed effects
+
+stateFEols <- lm(ln_obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
+yearFEols <- lm(ln_obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
+stateYearFEols <- lm(ln_obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
+
+stateFEiv <- ivreg(ln_obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
+yearFEiv <- ivreg(ln_obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
+stateYearFEiv <- ivreg(ln_obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
+
+stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv, type="text", model.names=TRUE, 
+          object.names=TRUE,  omit=c("state","Year"),
+          add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \\\\",
+                        "Year Fixed Effects & No & No & Yes & No & No & Yes \\\\")
+)
 
 ## check the first stage
 firstStage <- lm(ln_sales~ln_cost, data=regressionData)
@@ -98,29 +135,22 @@ firstStage <- lm(ln_sales~ln_cost, data=regressionData)
 ## check the reduced form
 reducedForm <- lm(ln_obesity~ln_cost, data=regressionData)
 
+# First-stage and reduced form state and year fixed effects
+#stateFEfirst <- lm(ln_sales~ln_cost, + factor(state) - 1, data=regressionData)
+#stateYearFEfirst <- lm(ln_sales~ln_cost + factor(state) - 1 + factor(Year) -1, data=regressionData)
+
+#stateFEreduced <- ivreg(ln_obesity~ln_cost, + factor(state) - 1, data=regressionData)
+#stateYearFEreduced <- ivreg(ln_obesity~ln_cost, + factor(state) - 1 + factor(Year) -1, data=regressionData)
+
+#stargazer(firstStage, stateFEfirst, stateYearFEfirst, reducedForm, stateFEreduced, stateYearFEreduced, type="text", model.names=TRUE, 
+#          object.names=TRUE,  omit=c("state","Year"),
+#          add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \\\\",
+#                        "Year Fixed Effects & No & No & Yes & No & No & Yes \\\\"))
+
 stargazer(firstStage,reducedForm, type="text", model.names=TRUE, object.names=TRUE)
 
-# STATE AND YEAR FIXED EFFECTS
 
-#stateFE <- summary(feols(obesity ~ sales_per_capita | state, data=regressionData))
-stateFEols <- lm(obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
-#yearFE <- summary(feols(obesity ~ sales_per_capita | Year, data=regressionData))
-yearFEols <- lm(obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
-#stateYearFE <- summary(feols(obesity ~ sales_per_capita | state + Year, data=regressionData))
-stateYearFEols <- lm(obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
-
-stateFEiv <- ivreg(obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
-yearFEiv <- ivreg(obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
-stateYearFEiv <- ivreg(obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
-
-stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv, type="text", model.names=TRUE, 
-          object.names=TRUE,  omit=c("state","Year"),
-          add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \\\\",
-                             "Year Fixed Effects & No & No & Yes & No & No & Yes \\\\")
-)
-
-
-
+save.image("workspace.RData")
 
 
 

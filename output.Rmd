@@ -7,10 +7,89 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, stringr, readxl, data.table, 
+gdata, scales, stargazer, ivpack, knitr, tinytex)
+library(tidyverse)
+library(rdrobust)
+library(rddensity)
+library(MatchIt)
+library(cobalt)
+library(tinytex)
+library(lubridate)
+#source("mainScript.R")
+load("workspace.RData")
 ```
 
-```{r summary}
-ggplot(bothByYear, aes(x=Year, y=percChangeCig, color="Percent Change in Cigarette Sales")) + geom_point() + geom_point(data=bothByYear, aes(x=Year, y=percChangeObesity, color="Percent Change in Obesity")) + geom_hline(yintercept=0, color = "red")
+```{r summary table, message=FALSE, warning=FALSE, echo=FALSE}
+summaryTable <- bothByYear2 %>% mutate(SalesPerCapita=sales.x, ObesityRate=obesity.y) %>% select(Year,SalesPerCapita,ObesityRate, percChangeCig, percChangeObesity)
 
-bothByYearCombined
+knitr::kable(summaryTable,
+             col.names=c("Year", "Cigarette Sales Per Capita", "Obesity Rate", "Percent Change in Cigarette Sales", "Percent Change in Obesity"),
+             digits=c(2),
+             caption="", booktabs=TRUE) 
 ```
+
+```{r summary figures, message=FALSE, echo=FALSE}
+ggplot(CigData, aes(x=Year,y=price_cpi_2012)) +
+  stat_summary(fun.y="mean",geom="line") +
+  labs(
+    x="Year",
+    y="Cost per Pack ($)",
+    title="Cost per Cigarette Pack in 2012 Real Dollars"
+  ) + theme_bw() +
+  scale_x_continuous(breaks=seq(1970, 2020, 5))
+
+ggplot(bothByYear2, aes(x=Year,y=sales.x, color="Cigarette Sales")) +
+  geom_line() +
+  geom_line(data=bothByYear2,aes(x=Year,y=obesity.y, color="Obesity")) +
+  ggtitle("Cigarette Sales and Obesity Over Time") +
+  xlab("Year") + ylab("Sales per Capita or Percent Obesity")
+
+
+```
+
+```{r unused figures, message=FALSE, echo=FALSE}
+ggplot(bothByYear2, aes(x=Year, y=percChangeCig, color="Percent Change in Cigarette Sales")) + geom_point() + geom_point(data=bothByYear2, aes(x=Year, y=percChangeObesity, color="Percent Change in Obesity")) + geom_hline(yintercept=0, color = "red")
+
+ggplot(bothByYear2, aes(x=percChangeCig, y=percChangeObesity)) + geom_line()
+
+ggplot(bothByYear2, aes(x=Year,y=propCig, color="Cigarette Sales")) +
+  geom_line() +
+  geom_line(data=bothByYear2,aes(x=Year,y=propObesity, color="Obesity")) +
+  ggtitle("Cigarette Sales and Obesity (as proportion of last year) Over Time") +
+  xlab("Year") + ylab("Proportion") +
+  geom_hline(yintercept=100, color = "red")
+
+ggplot(bothByYear2, aes(x=sales.x, y=obesity.y)) + geom_line() +
+  ggtitle("Obesity Rates Increase as Cigarette Sales Decrease") +
+  xlab("Cigarette Sales per Capita") + ylab("Obesity Rate")
+```
+\newpage
+\clearpage
+```{r choosing instrument, warning=FALSE, message=FALSE, echo=FALSE, results='asis'}
+# first stage for prices on sales
+firstStagePrice <- lm(formula = sales_per_capita ~ cost_per_pack, data = regressionData)
+
+# first stage for taxes on sales
+firstStageTaxes <- lm(formula = sales_per_capita ~ tax_dollar, data = regressionData)
+
+stargazer(firstStagePrice, firstStageTaxes, type="text")
+```
+\ new page
+```{r regression results, message=FALSE, echo=FALSE, global_options=TRUE, results='asis'}
+print(stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv,
+                type="latex", model.names=TRUE, object.names=TRUE,
+                omit=c("state","Year"),
+                add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \ ",
+                        "Year Fixed Effects & No & No & Yes & No & No & Yes \ "),
+                tidy=TRUE),
+      scalebox='0.1',header=FALSE, keep.stat=c("n","rsq"))
+
+stargazer(firstStage,reducedForm, type="latex", model.names=TRUE, object.names=TRUE)
+```
+
+
+
+
+
