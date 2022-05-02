@@ -4,10 +4,24 @@ library(AER)
 library(stargazer)
 library(cobalt)
 
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(tidyverse, ggplot2, dplyr, lubridate, readr, readxl,
+               scales, cobalt, ivpack, stargazer, ggthemes, AER, fixest)
+
 CigData <- readRDS("~/Desktop/ECON 470/tobaccoLaptop/TaxBurden_Data.rds")
 ObesityPercentOver18 <- read_csv("~/Desktop/ECON470FINAL/ObesityPercentOver18.csv")
 
-summary(TaxBurden_Data)
+# CONVERTING TO 2012 REAL DOLLARS
+CigData <- CigData %>%
+  mutate(tax_change = tax_state - lag(tax_state),
+         tax_change_d = ifelse(tax_change==0,0,1),
+         price_cpi_2012 = cost_per_pack*(229.5939/index),
+         total_tax_cpi_2012=tax_dollar*(229.5939/index),
+         ln_sales=log(sales_per_capita),
+         ln_price_2012=log(price_cpi_2012))
+
+# COMBINING DATA
+CigObesity <- inner_join(CigData,ObesityPercentOver18, by=c("Year"="YearStart","state"="LocationDesc"))
 
 # SUMMARIES
 # Cigarette Sales Over Time
@@ -45,103 +59,103 @@ ggplot(bothByYear, aes(x=Year,y=percChangeCig, color="Cigarette Sales")) +
 bothByYearCombined <- bothByYear %>% group_by(Year) %>% summarize(percChangeCig = mean(percChangeCig,na.rm=TRUE), percChangeObesity = mean(percChangeObesity, na.rm=TRUE)) %>% filter(Year>=2012 & Year<=2018)
 ggplot(bothByYear, aes(x=percChangeCig, y=percChangeObesity)) + geom_point()
 
-CigObesity <- inner_join(CigData,ObesityPercentOver18, by=c("Year"="YearStart","state"="LocationDesc"))
-
 # other variables that affect obesity
   # income, race, gender, education
 
-# CONVERTING TO 2012 REAL DOLLARS
-CigObesity<- CigObesity %>% mutate(cpiTwelve = NA)
-
-for(n in 1:nrow(CigObesity)){
-  for(m in 1:nrow(CigObesity)){
-    if(CigObesity[m,]$state==CigObesity[n,]$state){
-      if(CigObesity[n,]$Year==2012){
-        #q3v2[n,]$cpiTwelve <- q3v2[n,]$price_cpi
-        CigObesity[m,]$cpiTwelve <- CigObesity[n,]$price_cpi
-      }
-    }
-  }
-}
-
-CigObesity <- CigObesity %>%
-  mutate(real2012tax_dollar = tax_dollar*(price_cpi/cpiTwelve)) %>%
-  mutate(real2012cost_per_pack = cost_per_pack*(price_cpi/cpiTwelve))
 
 # adding ln to dataset
 regressionData <- CigObesity %>%
   filter(Question=="Percent of adults aged 18 years and older who have obesity") %>%
-  mutate(ln_obesity = log(Data_Value)) %>%
-  mutate(ln_sales = log(sales_per_capita))
+  group_by(Year,state) %>%
+  summarize(sales_per_capita = mean(sales_per_capita,na.rm=TRUE), cost_per_pack = mean(cost_per_pack,na.rm=TRUE),
+            obesity=mean(Data_Value,na.rm=TRUE)) %>%
+  mutate(ln_obesity = log(obesity)) %>%
+  mutate(ln_sales = log(sales_per_capita)) %>%
+  mutate(ln_cost = log(cost_per_pack))
 
 # simple regression to see relationship between cigarette sales and obesity
-regress <- lm(ln_obesity ~ ln_sales, data=regressionData)
-summary(regress)
+ols <- lm(ln_obesity ~ ln_sales, data=regressionData)
+summary(ols)
 
 # CHOOSING INSTRUMENT
 # first stage for prices on sales
-lm(formula = sales_per_capita ~ price_per_pack, data = regressionData)
+firstStagePrice <- lm(formula = sales_per_capita ~ cost_per_pack, data = regressionData)
+summary(firstStagePrice)
 
 # first stage for taxes on sales
-lm(formula = sales_per_capita ~ tax_dollar, data = regressionData)
+firstStageTaxes <- lm(formula = sales_per_capita ~ tax_dollar, data = regressionData)
+summary(firstStageTaxes)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# regress log obesity on log sales to estimate association between cigarette sales and obesity
-regress <- lm(ln_obesity ~ ln_sales, data=regressionData)
-summary(regress)
-
-# regress log obesity on log sales using the total (federal and state) cigarette tax (in dollars) as an instrument for log sales. Interpret your results and compare your estimates to those without an instrument. Are they different? If so, why?
-
-# iv <- ivreg(formula = ln_obesity ~ ln_sales | price OR tax 2012 dollars? , data = CigObesity)
+# IV Regression
 iv <- ivreg(formula = ln_obesity ~ ln_sales | cost_per_pack , data = regressionData)
 summary(iv)
 
-ols <- lm(y~d, data=regressionData)
-iv <- ivreg(y ~ d | z, data=regressionData)
+stargazer(ols, iv, type="text", model.names=TRUE, object.names=TRUE)
 
 ## check the first stage
-summary(lm(d~z, data=regressionData))
+firstStage <- lm(ln_sales~ln_cost, data=regressionData)
 
 ## check the reduced form
-summary(lm(y~z, data=regressionData))
+reducedForm <- lm(ln_obesity~ln_cost, data=regressionData)
+
+stargazer(firstStage,reducedForm, type="text", model.names=TRUE, object.names=TRUE)
+
+# STATE AND YEAR FIXED EFFECTS
+
+#stateFE <- summary(feols(obesity ~ sales_per_capita | state, data=regressionData))
+stateFEols <- lm(obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
+#yearFE <- summary(feols(obesity ~ sales_per_capita | Year, data=regressionData))
+yearFEols <- lm(obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
+#stateYearFE <- summary(feols(obesity ~ sales_per_capita | state + Year, data=regressionData))
+stateYearFEols <- lm(obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
+
+stateFEiv <- ivreg(obesity ~ sales_per_capita + factor(state) - 1, data=regressionData)
+yearFEiv <- ivreg(obesity ~ sales_per_capita + factor(Year) - 1, data=regressionData)
+stateYearFEiv <- ivreg(obesity ~ sales_per_capita + factor(state) - 1 + factor(Year) -1, data=regressionData)
+
+stargazer(ols, stateFEols, stateYearFEols, iv, stateFEiv, stateYearFEiv, type="text", model.names=TRUE, 
+          object.names=TRUE,  omit=c("state","Year"),
+          add.lines = c("State Fixed Effects & No & Yes & Yes & No & Yes & Yes \\\\",
+                             "Year Fixed Effects & No & No & Yes & No & No & Yes \\\\")
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## in two stages
-step1 <- lm(d ~ z, data=regressionData)
+step1 <- lm(obesity ~ sales_per_capita, data=regressionData)
 d.hat <- predict(step1)
-step2 <- lm(y ~ d.hat, data=regressionData)
+step2 <- lm(obesity ~ d.hat, data=regressionData)
 summary(step2)
 
-# first stage and reduced-form results from the instrument
-# first stage
-firstStage <- lm(formula = ln_sales ~ tax_dollar, data = regressionData)
-FirstStage <- summary(firstStage)
-FirstStage
+# state and year fixed effects
+fixedEffects = fixest::fixef(ols)
+summary(fixedEffects)
 
-#reduced form
-reducedForm <- lm(formula = ln_sales ~ tax_dollar, data=regressionData)
-ReducedForm <- summary(reducedForm)
 
-ivStargazer <- stargazer(firstStage,reducedForm, type="text", title="First Stage and Reduced Form", model.names=TRUE, object.names=TRUE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
